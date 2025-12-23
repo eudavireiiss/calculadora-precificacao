@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard Comparativo - Calculadora de Precificação</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <style>
+        .card-dashboard {
+            transition: transform 0.3s;
+            margin-bottom: 20px;
+        }
+        .card-dashboard:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 20px rgba(0,0,0,0.1);
+        }
+        .metric-value {
+            font-size: 2rem;
+            font-weight: bold;
+        }
+        .metric-label {
+            color: #6c757d;
+            font-size: 0.9rem;
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+        <div class="container">
+            <a class="navbar-brand" href="/">
+                📊 Dashboard de Comparativo
+            </a>
+            <div class="navbar-nav">
+                <a class="nav-link" href="/">Home</a>
+                <a class="nav-link active" href="/dashboard">Dashboard</a>
+                <a class="nav-link" href="/adicionar">Adicionar Produto</a>
+                <a class="nav-link" href="/lista">Lista de Produtos</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mt-4">
+        <h1 class="mb-4">📈 Dashboard Comparativo de Vendas</h1>
+        
+        <!-- Seletor de Aba da Planilha -->
+        <div class="row mb-4">
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">
+                        <h5>Fonte de Dados</h5>
+                    </div>
+                    <div class="card-body">
+                        <p>📋 Planilha do Google Sheets carregada automaticamente</p>
+                        <div class="input-group mb-3">
+                            <select class="form-select" id="seletorAba">
+                                <option value="PRODUTOS">Aba: PRODUTOS</option>
+                                <option value="TABELA 1">Aba: TABELA 1</option>
+                                <option value="TABELA 2">Aba: TABELA 2</option>
+                            </select>
+                            <button class="btn btn-primary" onclick="carregarAba()">
+                                Carregar Dados
+                            </button>
+                        </div>
+                        <button class="btn btn-outline-secondary btn-sm" onclick="atualizarDashboard()">
+                            🔄 Atualizar Dashboard
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Métricas -->
+        <div class="row" id="metricas-container">
+            <!-- As métricas serão carregadas via JavaScript -->
+            <div class="col-12 text-center">
+                <div class="spinner-border text-primary" role="status">
+                    <span class="visually-hidden">Carregando...</span>
+                </div>
+                <p>Carregando dados da planilha...</p>
+            </div>
+        </div>
+
+        <!-- Tabela de Dados -->
+        <div class="row mt-4">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header">
+                        <h5>📋 Visualização dos Dados da Planilha</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-hover" id="tabela-dados">
+                                <thead id="tabela-cabecalho">
+                                    <!-- Cabeçalho será preenchido por JS -->
+                                </thead>
+                                <tbody id="tabela-corpo">
+                                    <!-- Dados serão preenchidos por JS -->
+                                </tbody>
+                            </table>
+                        </div>
+                        <div class="mt-3">
+                            <small class="text-muted" id="info-carregamento">
+                                Última atualização: --
+                            </small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Comparação com Produtos Calculados -->
+        <div class="row mt-4">
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">
+                        <h5>📊 Produtos Calculados no Sistema</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-6">
+                                <div class="metric-label">Total de Produtos</div>
+                                <div class="metric-value text-primary">{{ total_produtos }}</div>
+                            </div>
+                            <div class="col-6">
+                                <div class="metric-label">Economia Potencial</div>
+                                <div class="metric-value text-success" id="economia-total">
+                                    R$ 0,00
+                                </div>
+                            </div>
+                        </div>
+                        <canvas id="graficoSituacao" width="400" height="200"></canvas>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">
+                        <h5>📈 Análise Comparativa</h5>
+                    </div>
+                    <div class="card-body">
+                        <div id="analise-comparativa">
+                            <p>Carregando análise comparativa...</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Função para carregar dados do dashboard
+        function atualizarDashboard() {
+            $('#metricas-container').html(`
+                <div class="col-12 text-center">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Carregando...</span>
+                    </div>
+                </div>
+            `);
+            
+            $.get('/api/dashboard/dados', function(response) {
+                if (response.success) {
+                    atualizarMetricas(response.dados_sheets);
+                    atualizarTabela(response.dados_sheets);
+                    atualizarProdutosCalculados(response.produtos_calculados);
+                    $('#info-carregamento').text(`Última atualização: ${response.timestamp}`);
+                }
+            });
+        }
+        
+        function carregarAba() {
+            const aba = $('#seletorAba').val();
+            
+            $.get(`/api/sheets/preview?aba=${aba}&limite=20`, function(response) {
+                if (response.success) {
+                    atualizarTabelaPreview(response);
+                }
+            });
+        }
+        
+        function atualizarMetricas(dados) {
+            let html = '';
+            
+            if (dados.erro) {
+                html = `<div class="col-12">
+                    <div class="alert alert-warning">
+                        <strong>Aviso:</strong> ${dados.erro}
+                        <br><small>Verifique se a planilha está publicada corretamente.</small>
+                    </div>
+                </div>`;
+            } else {
+                html = `
+                <div class="col-md-3">
+                    <div class="card card-dashboard">
+                        <div class="card-body text-center">
+                            <div class="metric-label">Registros na Planilha</div>
+                            <div class="metric-value text-primary">${dados.total_registros || 0}</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card card-dashboard">
+                        <div class="card-body text-center">
+                            <div class="metric-label">Colunas Disponíveis</div>
+                            <div class="metric-value text-success">${dados.colunas_disponiveis ? dados.colunas_disponiveis.length : 0}</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Adicione mais métricas baseadas nos dados -->
+                <div class="col-md-6">
+                    <div class="card card-dashboard">
+                        <div class="card-body">
+                            <h6>Colunas Encontradas</h6>
+                            <div class="d-flex flex-wrap">
+                                ${dados.colunas_disponiveis ? dados.colunas_disponiveis.map(col => 
+                                    `<span class="badge bg-secondary me-2 mb-2">${col}</span>`
+                                ).join('') : 'Nenhuma coluna identificada'}
+                            </div>
+                        </div>
+                    </div>
+                </div>`;
+            }
+            
+            $('#metricas-container').html(html);
+        }
+        
+        function atualizarTabelaPreview(response) {
+            // Atualiza cabeçalho
+            let thead = '<tr>';
+            response.colunas.forEach(col => {
+                thead += `<th>${col}</th>`;
+            });
+            thead += '</tr>';
+            $('#tabela-cabecalho').html(thead);
+            
+            // Atualiza corpo
+            let tbody = '';
+            response.preview.forEach(row => {
+                tbody += '<tr>';
+                response.colunas.forEach(col => {
+                    tbody += `<td>${row[col] || ''}</td>`;
+                });
+                tbody += '</tr>';
+            });
+            $('#tabela-corpo').html(tbody);
+            
+            $('#info-carregamento').text(
+                `Mostrando ${response.preview.length} de ${response.total_registros} registros da aba "${response.aba}"`
+            );
+        }
+        
+        function atualizarTabela(dados) {
+            if (dados.primeiros_registros && dados.primeiros_registros.length > 0) {
+                atualizarTabelaPreview({
+                    success: true,
+                    colunas: dados.colunas_disponiveis || [],
+                    preview: dados.primeiros_registros,
+                    total_registros: dados.total_registros || 0,
+                    aba: 'PRODUTOS'
+                });
+            }
+        }
+        
+        function atualizarProdutosCalculados(produtos) {
+            // Atualiza economia total
+            $('#economia-total').text(`R$ ${produtos.economia_total.toLocaleString('pt-BR', {minimumFractionDigits: 2})}`);
+            
+            // Atualiza gráfico de situação
+            const ctx = document.getElementById('graficoSituacao').getContext('2d');
+            if (window.graficoSituacao) {
+                window.graficoSituacao.destroy();
+            }
+            
+            window.graficoSituacao = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Competitivos', 'Atenção', 'Críticos'],
+                    datasets: [{
+                        data: [produtos.competitivos, produtos.atencao, produtos.criticos],
+                        backgroundColor: ['#28a745', '#ffc107', '#dc3545']
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: {
+                            position: 'bottom'
+                        }
+                    }
+                }
+            });
+            
+            // Atualiza análise comparativa
+            let analiseHtml = `
+                <p><strong>Total de produtos analisados:</strong> ${produtos.total}</p>
+                <div class="progress mb-3" style="height: 25px;">
+                    <div class="progress-bar bg-success" style="width: ${produtos.competitivos / produtos.total * 100}%">
+                        Competitivos: ${produtos.competitivos}
+                    </div>
+                    <div class="progress-bar bg-warning" style="width: ${produtos.atencao / produtos.total * 100}%">
+                        Atenção: ${produtos.atencao}
+                    </div>
+                    <div class="progress-bar bg-danger" style="width: ${produtos.criticos / produtos.total * 100}%">
+                        Críticos: ${produtos.criticos}
+                    </div>
+                </div>
+                <p><strong>Economia potencial total:</strong> R$ ${produtos.economia_total.toFixed(2)}</p>
+            `;
+            
+            $('#analise-comparativa').html(analiseHtml);
+        }
+        
+        // Carrega dados ao abrir a página
+        $(document).ready(function() {
+            atualizarDashboard();
+            
+            // Atualiza a cada 5 minutos
+            setInterval(atualizarDashboard, 5 * 60 * 1000);
+        });
+    </script>
+</body>
+</html>

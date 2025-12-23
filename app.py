@@ -6,6 +6,8 @@ from io import BytesIO
 import json
 from datetime import datetime
 import uuid
+import functools
+from datetime import timedelta
 
 app = Flask(__name__)
 app.secret_key = 'sua_chave_secreta_aqui'  # Mude para produção!
@@ -18,10 +20,122 @@ os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 # Dados em memória (em produção use um banco de dados)
 produtos_data = []
 
-# Funções de cálculo
+# ID da sua planilha pública
+SHEET_ID = "1gwu2QVQPCBBYdVJIIELcC3hj68h0p4yAwFjF6jsr3bE"
+
+# Sistema de cache simples
+cache_data = {}
+cache_time = {}
+
+# ========== FUNÇÕES DE CACHE ==========
+def cache_result(minutes=5):
+    """Decorador para cache de dados do Google Sheets"""
+    def decorator(func):
+        @functools.wraps(func)
+        def wrapper(*args, **kwargs):
+            cache_key = f"{func.__name__}_{str(kwargs)}"
+            
+            # Verifica se está em cache e ainda válido
+            if cache_key in cache_data:
+                if datetime.now() - cache_time[cache_key] < timedelta(minutes=minutes):
+                    print(f"Usando cache para {cache_key}")
+                    return cache_data[cache_key]
+            
+            # Executa função e armazena em cache
+            result = func(*args, **kwargs)
+            cache_data[cache_key] = result
+            cache_time[cache_key] = datetime.now()
+            print(f"Cache atualizado para {cache_key}")
+            
+            return result
+        return wrapper
+    return decorator
+
+# ========== FUNÇÕES PARA GOOGLE SHEETS ==========
+@cache_result(minutes=10)  # Cache de 10 minutos para Google Sheets
+def carregar_aba_sheets(aba_nome):
+    """Carrega uma aba específica da sua planilha do Google Sheets"""
+    try:
+        # Formata a URL para CSV (forma mais simples)
+        url = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/gviz/tq?tqx=out:csv&sheet={aba_nome}"
+        
+        # Carrega os dados
+        df = pd.read_csv(url, encoding='utf-8')
+        print(f"Aba '{aba_nome}' carregada: {df.shape[0]} linhas, {df.shape[1]} colunas")
+        
+        # Log das primeiras colunas para debug
+        print(f"Colunas encontradas: {list(df.columns[:5])}...")
+        
+        return df
+        
+    except Exception as e:
+        print(f"Erro ao carregar aba '{aba_nome}': {e}")
+        return pd.DataFrame()
+
+def carregar_todos_dados():
+    """Carrega todas as abas relevantes da planilha"""
+    # Adapte os nomes das abas conforme sua planilha
+    abas = {
+        'produtos': 'PRODUTOS',
+        'tabela1': 'TABELA 1', 
+        'tabela2': 'TABELA 2',
+        'vendas': 'VENDAS'  # Adicione outras abas conforme necessário
+    }
+    
+    dados = {}
+    for key, aba_nome in abas.items():
+        dados[key] = carregar_aba_sheets(aba_nome)
+    
+    return dados
+
+def analisar_dados_vendas():
+    """Análise específica para dashboard de vendas"""
+    try:
+        # Carrega dados da planilha
+        dados = carregar_todos_dados()
+        
+        # Verifica quais abas foram carregadas com sucesso
+        abas_carregadas = {k: v for k, v in dados.items() if not v.empty}
+        print(f"Abas carregadas com sucesso: {list(abas_carregadas.keys())}")
+        
+        # Exemplo de análise com a aba PRODUTOS
+        if 'produtos' in abas_carregadas:
+            df_produtos = dados['produtos']
+            
+            # Tenta identificar colunas automaticamente
+            colunas = df_produtos.columns.tolist()
+            print(f"Colunas na aba PRODUTOS: {colunas}")
+            
+            # Processamento básico dos dados
+            analise = {
+                'total_registros': len(df_produtos),
+                'colunas_disponiveis': colunas,
+                'primeiros_registros': df_produtos.head().to_dict('records'),
+                'estatisticas': {}
+            }
+            
+            # Tenta calcular estatísticas para colunas numéricas
+            for col in df_produtos.select_dtypes(include=[np.number]).columns:
+                analise['estatisticas'][col] = {
+                    'media': float(df_produtos[col].mean()),
+                    'mediana': float(df_produtos[col].median()),
+                    'min': float(df_produtos[col].min()),
+                    'max': float(df_produtos[col].max()),
+                    'soma': float(df_produtos[col].sum())
+                }
+            
+            return analise
+        
+        return {'erro': 'Nenhuma aba relevante encontrada'}
+        
+    except Exception as e:
+        print(f"Erro na análise: {e}")
+        return {'erro': str(e)}
+
+# ========== FUNÇÕES DE CÁLCULO EXISTENTES ==========
 def calcular_precificacao(mercado, preco_nf, imposto_perc):
     """Calcula toda a cadeia de precificação"""
-    
+    # Seu código existente aqui (mantido igual)
     pc_nf_imposto = preco_nf * (1 + imposto_perc/100)
     pmz_cd = pc_nf_imposto * 1.101 * 1.03
     pmz_loja = pmz_cd
@@ -65,7 +179,64 @@ def calcular_precificacao(mercado, preco_nf, imposto_perc):
         'situacao_texto': situacao_texto
     }
 
-# Rotas
+# ========== NOVAS ROTAS PARA DASHBOARD ==========
+@app.route('/dashboard')
+def dashboard():
+    """Página principal do dashboard"""
+    # Carrega dados da planilha
+    dados_sheets = analisar_dados_vendas()
+    
+    # Seu dashboard terá duas fontes de dados:
+    # 1. Dados da planilha do Google Sheets
+    # 2. Dados dos produtos calculados no app
+    
+    return render_template('dashboard.html', 
+                         dados_sheets=dados_sheets,
+                         produtos=produtos_data,
+                         total_produtos=len(produtos_data))
+
+@app.route('/api/dashboard/dados')
+@cache_result(minutes=5)  # Cache de 5 minutos para API
+def api_dashboard_dados():
+    """API para dados do dashboard (usada por AJAX)"""
+    dados_sheets = analisar_dados_vendas()
+    
+    return jsonify({
+        'success': True,
+        'dados_sheets': dados_sheets,
+        'produtos_calculados': {
+            'total': len(produtos_data),
+            'criticos': sum(1 for p in produtos_data if p['situacao'] == 'danger'),
+            'atencao': sum(1 for p in produtos_data if p['situacao'] == 'warning'),
+            'competitivos': sum(1 for p in produtos_data if p['situacao'] == 'success'),
+            'economia_total': round(sum(p['dif_nf'] for p in produtos_data), 2)
+        },
+        'timestamp': datetime.now().strftime('%d/%m/%Y %H:%M:%S')
+    })
+
+@app.route('/api/sheets/preview')
+def api_sheets_preview():
+    """API para visualizar dados da planilha"""
+    aba = request.args.get('aba', 'PRODUTOS')
+    limite = int(request.args.get('limite', 10))
+    
+    df = carregar_aba_sheets(aba)
+    
+    if df.empty:
+        return jsonify({'success': False, 'message': 'Aba não encontrada ou vazia'})
+    
+    preview = df.head(limite).to_dict('records')
+    colunas = df.columns.tolist()
+    
+    return jsonify({
+        'success': True,
+        'aba': aba,
+        'colunas': colunas,
+        'total_registros': len(df),
+        'preview': preview
+    })
+
+# ========== ROTAS EXISTENTES (MANTIDAS) ==========
 @app.route('/')
 def index():
     return render_template('index.html', produtos=produtos_data)
@@ -108,102 +279,6 @@ def adicionar():
     
     return render_template('adicionar.html')
 
-@app.route('/importar', methods=['GET', 'POST'])
-def importar():
-    if request.method == 'POST':
-        if 'file' not in request.files:
-            return jsonify({'success': False, 'message': 'Nenhum arquivo enviado'})
-        
-        file = request.files['file']
-        if file.filename == '':
-            return jsonify({'success': False, 'message': 'Nenhum arquivo selecionado'})
-        
-        if file and file.filename.endswith('.xlsx'):
-            try:
-                df = pd.read_excel(file)
-                
-                # Verificar colunas
-                colunas = df.columns.tolist()
-                
-                return jsonify({
-                    'success': True,
-                    'colunas': colunas,
-                    'preview': df.head(10).to_dict('records')
-                })
-                
-            except Exception as e:
-                return jsonify({'success': False, 'message': str(e)})
-    
-    return render_template('importar.html')
-
-@app.route('/processar-importacao', methods=['POST'])
-def processar_importacao():
-    data = request.json
-    coluna_produtos = data.get('coluna_produtos')
-    coluna_codigo = data.get('coluna_codigo', '')
-    coluna_preco_nf = data.get('coluna_preco_nf', '')
-    
-    mercado_padrao = float(data.get('mercado_padrao', 2.49))
-    preco_nf_padrao = float(data.get('preco_nf_padrao', 3.00))
-    imposto_padrao = float(data.get('imposto_padrao', 2.01))
-    
-    produtos_selecionados = data.get('produtos_selecionados', [])
-    
-    try:
-        # Aqui processaria o arquivo novamente
-        # Por simplicidade, vou criar produtos fictícios
-        produtos_importados = []
-        
-        for produto_nome in produtos_selecionados:
-            resultados = calcular_precificacao(mercado_padrao, preco_nf_padrao, imposto_padrao)
-            
-            novo_produto = {
-                'id': str(uuid.uuid4()),
-                'produto': produto_nome,
-                'mercado': mercado_padrao,
-                'preco_nf': preco_nf_padrao,
-                'imposto_perc': imposto_padrao,
-                'codigo_nf': f"IMP_{produto_nome[:10]}",
-                'data_cadastro': datetime.now().strftime('%d/%m/%Y %H:%M'),
-                **resultados
-            }
-            
-            produtos_data.append(novo_produto)
-            produtos_importados.append(novo_produto)
-        
-        return jsonify({
-            'success': True,
-            'message': f'{len(produtos_importados)} produtos importados com sucesso!',
-            'importados': produtos_importados
-        })
-        
-    except Exception as e:
-        return jsonify({'success': False, 'message': str(e)})
-
-@app.route('/buscar', methods=['GET', 'POST'])
-def buscar():
-    if request.method == 'POST':
-        termo = request.form.get('termo', '').lower()
-        coluna = request.form.get('coluna', 'produto')
-        
-        resultados = []
-        for produto in produtos_data:
-            if termo:
-                if coluna == 'todos':
-                    # Buscar em todos os campos de texto
-                    if (termo in produto['produto'].lower() or 
-                        termo in produto.get('codigo_nf', '').lower()):
-                        resultados.append(produto)
-                elif coluna in produto:
-                    if termo in str(produto[coluna]).lower():
-                        resultados.append(produto)
-            else:
-                resultados.append(produto)
-        
-        return render_template('buscar.html', resultados=resultados, termo=termo, coluna=coluna)
-    
-    return render_template('buscar.html', resultados=[], termo='', coluna='produto')
-
 @app.route('/lista')
 def lista():
     return render_template('lista.html', produtos=produtos_data)
@@ -212,98 +287,7 @@ def lista():
 def analise():
     return render_template('analise.html', produtos=produtos_data)
 
-@app.route('/exportar')
-def exportar():
-    if not produtos_data:
-        return jsonify({'success': False, 'message': 'Nenhum dado para exportar'})
-    
-    try:
-        df = pd.DataFrame(produtos_data)
-        
-        # Remover colunas internas
-        colunas_exportar = [
-            'produto', 'codigo_nf', 'mercado', 'preco_nf', 'imposto_perc',
-            'pc_nf_imposto', 'pmz_cd', 'pmz_loja', 'pc_dist', 'pc_piso',
-            'perc_nf_mercado', 'perc_pmz_mercado', 'perc_dist_mercado',
-            'perc_piso_mercado', 'novo_custo', 'dif_nf', 'situacao_texto',
-            'data_cadastro'
-        ]
-        
-        df_export = df[colunas_exportar]
-        
-        # Renomear colunas
-        df_export.columns = [
-            'Produto', 'Código NF', 'Preço Mercado', 'Preço NF', 'Imposto %',
-            'PC NF + Imposto', 'PMZ CD', 'PMZ Loja', 'PC Dist', 'PC Piso',
-            '% NF vs Mercado', '% PMZ vs Mercado', '% Dist vs Mercado',
-            '% PISO vs Mercado', 'Novo Custo', 'Diferença NF', 'Situação',
-            'Data Cadastro'
-        ]
-        
-        output = BytesIO()
-        with pd.ExcelWriter(output, engine='openpyxl') as writer:
-            df_export.to_excel(writer, index=False, sheet_name='Resultados')
-        
-        output.seek(0)
-        
-        return send_file(
-            output,
-            mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-            as_attachment=True,
-            download_name=f'resultados_precificacao_{datetime.now().strftime("%Y%m%d_%H%M%S")}.xlsx'
-        )
-        
-    except Exception as e:
-        return jsonify({'success': False, 'message': str(e)})
-
-@app.route('/api/calcular', methods=['POST'])
-def api_calcular():
-    try:
-        data = request.json
-        mercado = float(data.get('mercado', 0))
-        preco_nf = float(data.get('preco_nf', 0))
-        imposto_perc = float(data.get('imposto_perc', 0))
-        
-        resultados = calcular_precificacao(mercado, preco_nf, imposto_perc)
-        
-        return jsonify({
-            'success': True,
-            'resultados': resultados
-        })
-        
-    except Exception as e:
-        return jsonify({'success': False, 'message': str(e)})
-
-@app.route('/api/limpar', methods=['POST'])
-def api_limpar():
-    global produtos_data
-    produtos_data = []
-    return jsonify({'success': True, 'message': 'Dados limpos com sucesso!'})
-
-@app.route('/api/estatisticas')
-def api_estatisticas():
-    if not produtos_data:
-        return jsonify({
-            'total': 0,
-            'criticos': 0,
-            'atencao': 0,
-            'competitivos': 0,
-            'economia_total': 0
-        })
-    
-    total = len(produtos_data)
-    criticos = sum(1 for p in produtos_data if p['situacao'] == 'danger')
-    atencao = sum(1 for p in produtos_data if p['situacao'] == 'warning')
-    competitivos = sum(1 for p in produtos_data if p['situacao'] == 'success')
-    economia_total = sum(p['dif_nf'] for p in produtos_data)
-    
-    return jsonify({
-        'total': total,
-        'criticos': criticos,
-        'atencao': atencao,
-        'competitivos': competitivos,
-        'economia_total': round(economia_total, 2)
-    })
+# ... (mantenha todas as outras rotas existentes)
 
 if __name__ == '__main__':
-    app.run(debug=True, port=5000)
+    app.run(debug=True, port=5000)  
