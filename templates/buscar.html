@@ -1,0 +1,478 @@
+{% extends "base.html" %}
+
+{% block title %}Buscar NF - Calculadora de Precificação{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title mb-0">
+                    <i class="bi bi-search me-2"></i>Busca Avançada
+                </h3>
+                <p class="text-muted mb-0 mt-2">Encontre produtos por código NF, nome ou qualquer termo</p>
+            </div>
+            <div class="card-body">
+                <!-- Formulário de Busca -->
+                <div class="row mb-4">
+                    <div class="col-md-8">
+                        <div class="card">
+                            <div class="card-body">
+                                <form id="form-busca" method="POST" action="/buscar">
+                                    <div class="row g-3">
+                                        <div class="col-md-8">
+                                            <label for="termo" class="form-label">Termo de Busca</label>
+                                            <div class="input-group">
+                                                <span class="input-group-text">
+                                                    <i class="bi bi-search"></i>
+                                                </span>
+                                                <input type="text" class="form-control" id="termo" 
+                                                       name="termo" value="{{ termo }}"
+                                                       placeholder="Digite nome do produto, código NF...">
+                                                <button class="btn btn-primary" type="submit">
+                                                    Buscar
+                                                </button>
+                                            </div>
+                                        </div>
+                                        
+                                        <div class="col-md-4">
+                                            <label for="coluna" class="form-label">Buscar em</label>
+                                            <select class="form-select" id="coluna" name="coluna">
+                                                <option value="produto" {% if coluna == 'produto' %}selected{% endif %}>
+                                                    Nome do Produto
+                                                </option>
+                                                <option value="codigo_nf" {% if coluna == 'codigo_nf' %}selected{% endif %}>
+                                                    Código NF
+                                                </option>
+                                                <option value="todos" {% if coluna == 'todos' %}selected{% endif %}>
+                                                    Todos os Campos
+                                                </option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- Filtros Avançados -->
+                                    <div class="accordion mt-4" id="filtrosAvancados">
+                                        <div class="accordion-item">
+                                            <h2 class="accordion-header">
+                                                <button class="accordion-button collapsed" type="button" 
+                                                        data-bs-toggle="collapse" data-bs-target="#collapseFiltros">
+                                                    <i class="bi bi-funnel me-2"></i>Filtros Avançados
+                                                </button>
+                                            </h2>
+                                            <div id="collapseFiltros" class="accordion-collapse collapse">
+                                                <div class="accordion-body">
+                                                    <div class="row g-3">
+                                                        <div class="col-md-3">
+                                                            <label class="form-label">Situação</label>
+                                                            <div class="form-check">
+                                                                <input class="form-check-input" type="checkbox" 
+                                                                       name="filtro_situacao" value="success" id="filtro-success" checked>
+                                                                <label class="form-check-label" for="filtro-success">
+                                                                    <span class="badge bg-success">Competitivo</span>
+                                                                </label>
+                                                            </div>
+                                                            <div class="form-check">
+                                                                <input class="form-check-input" type="checkbox" 
+                                                                       name="filtro_situacao" value="warning" id="filtro-warning" checked>
+                                                                <label class="form-check-label" for="filtro-warning">
+                                                                    <span class="badge bg-warning">Atenção</span>
+                                                                </label>
+                                                            </div>
+                                                            <div class="form-check">
+                                                                <input class="form-check-input" type="checkbox" 
+                                                                       name="filtro_situacao" value="danger" id="filtro-danger" checked>
+                                                                <label class="form-check-label" for="filtro-danger">
+                                                                    <span class="badge bg-danger">Crítico</span>
+                                                                </label>
+                                                            </div>
+                                                        </div>
+                                                        
+                                                        <div class="col-md-3">
+                                                            <label class="form-label">Preço NF (R$)</label>
+                                                            <div class="row g-2">
+                                                                <div class="col-6">
+                                                                    <input type="number" class="form-control" 
+                                                                           placeholder="Mín" name="preco_min" step="0.01">
+                                                                </div>
+                                                                <div class="col-6">
+                                                                    <input type="number" class="form-control" 
+                                                                           placeholder="Máx" name="preco_max" step="0.01">
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                        
+                                                        <div class="col-md-3">
+                                                            <label class="form-label">% vs Mercado</label>
+                                                            <div class="row g-2">
+                                                                <div class="col-6">
+                                                                    <input type="number" class="form-control" 
+                                                                           placeholder="Mín" name="perc_min" step="0.01">
+                                                                </div>
+                                                                <div class="col-6">
+                                                                    <input type="number" class="form-control" 
+                                                                           placeholder="Máx" name="perc_max" step="0.01">
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                        
+                                                        <div class="col-md-3">
+                                                            <label class="form-label">Ações</label>
+                                                            <div class="d-grid gap-2">
+                                                                <button type="button" class="btn btn-outline-primary" 
+                                                                        id="btn-aplicar-filtros">
+                                                                    Aplicar Filtros
+                                                                </button>
+                                                                <button type="button" class="btn btn-outline-secondary" 
+                                                                        id="btn-limpar-filtros">
+                                                                    Limpar Filtros
+                                                                </button>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="col-md-4">
+                        <div class="card">
+                            <div class="card-body">
+                                <h5 class="card-title">
+                                    <i class="bi bi-lightning-charge me-2 text-warning"></i>Busca Rápida
+                                </h5>
+                                <div class="list-group">
+                                    <button class="list-group-item list-group-item-action buscar-rapido" 
+                                            data-termo="critico">
+                                        <i class="bi bi-exclamation-triangle text-danger me-2"></i>
+                                        Produtos Críticos
+                                    </button>
+                                    <button class="list-group-item list-group-item-action buscar-rapido" 
+                                            data-termo="atencao">
+                                        <i class="bi bi-exclamation-circle text-warning me-2"></i>
+                                        Produtos em Atenção
+                                    </button>
+                                    <button class="list-group-item list-group-item-action buscar-rapido" 
+                                            data-termo="milho">
+                                        <i class="bi bi-tag text-info me-2"></i>
+                                        Produtos com "Milho"
+                                    </button>
+                                    <button class="list-group-item list-group-item-action buscar-rapido" 
+                                            data-termo="IMP_">
+                                        <i class="bi bi-file-earmark-text text-success me-2"></i>
+                                        Produtos Importados
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Resultados da Busca -->
+                <div class="row">
+                    <div class="col-12">
+                        <div class="card">
+                            <div class="card-header">
+                                <h5 class="card-title mb-0">
+                                    <i class="bi bi-search me-2"></i>
+                                    Resultados da Busca 
+                                    <span class="badge bg-primary ms-2" id="total-resultados">0</span>
+                                </h5>
+                            </div>
+                            <div class="card-body">
+                                {% if resultados %}
+                                <!-- Estatísticas da Busca -->
+                                <div class="row mb-4">
+                                    <div class="col-md-3">
+                                        <div class="card bg-dark border-secondary">
+                                            <div class="card-body text-center">
+                                                <h6 class="text-muted">Produtos Encontrados</h6>
+                                                <h3 class="text-white">{{ resultados|length }}</h3>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="col-md-3">
+                                        <div class="card bg-dark border-secondary">
+                                            <div class="card-body text-center">
+                                                <h6 class="text-muted">Economia Potencial</h6>
+                                                <h3 class="text-white">
+                                                    R$ {{ "%.2f"|format(resultados|sum(attribute='dif_nf')) }}
+                                                </h3>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="col-md-3">
+                                        <div class="card bg-dark border-secondary">
+                                            <div class="card-body text-center">
+                                                <h6 class="text-muted">% Médio vs Mercado</h6>
+                                                <h3 class="text-white">
+                                                    {{ "%.1f"|format(resultados|sum(attribute='perc_piso_mercado')/resultados|length if resultados else 0) }}%
+                                                </h3>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="col-md-3">
+                                        <div class="card bg-dark border-secondary">
+                                            <div class="card-body text-center">
+                                                <h6 class="text-muted">Preço NF Médio</h6>
+                                                <h3 class="text-white">
+                                                    R$ {{ "%.2f"|format(resultados|sum(attribute='preco_nf')/resultados|length if resultados else 0) }}
+                                                </h3>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <!-- Tabela de Resultados -->
+                                <div class="table-responsive">
+                                    <table class="table table-dark table-hover">
+                                        <thead>
+                                            <tr>
+                                                <th>Produto</th>
+                                                <th>Código NF</th>
+                                                <th>Preço NF</th>
+                                                <th>Mercado</th>
+                                                <th>% vs Mercado</th>
+                                                <th>Novo Custo</th>
+                                                <th>Diferença</th>
+                                                <th>Situação</th>
+                                                <th>Ações</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {% for produto in resultados %}
+                                            <tr>
+                                                <td>{{ produto.produto }}</td>
+                                                <td>
+                                                    {% if produto.codigo_nf %}
+                                                    <span class="badge bg-info">{{ produto.codigo_nf }}</span>
+                                                    {% else %}
+                                                    <span class="text-muted">-</span>
+                                                    {% endif %}
+                                                </td>
+                                                <td>R$ {{ "%.2f"|format(produto.preco_nf) }}</td>
+                                                <td>R$ {{ "%.2f"|format(produto.mercado) }}</td>
+                                                <td>
+                                                    {% if produto.perc_piso_mercado >= 0 %}
+                                                    <span class="text-success">{{ "%.2f"|format(produto.perc_piso_mercado) }}%</span>
+                                                    {% elif produto.perc_piso_mercado > -20 %}
+                                                    <span class="text-warning">{{ "%.2f"|format(produto.perc_piso_mercado) }}%</span>
+                                                    {% else %}
+                                                    <span class="text-danger">{{ "%.2f"|format(produto.perc_piso_mercado) }}%</span>
+                                                    {% endif %}
+                                                </td>
+                                                <td>R$ {{ "%.2f"|format(produto.novo_custo) }}</td>
+                                                <td>
+                                                    {% if produto.dif_nf < 0 %}
+                                                    <span class="text-danger">R$ {{ "%.2f"|format(produto.dif_nf) }}</span>
+                                                    {% else %}
+                                                    <span class="text-success">R$ {{ "%.2f"|format(produto.dif_nf) }}</span>
+                                                    {% endif %}
+                                                </td>
+                                                <td>
+                                                    <span class="badge bg-{{ produto.situacao }}">
+                                                        {{ produto.situacao_texto }}
+                                                    </span>
+                                                </td>
+                                                <td>
+                                                    <div class="btn-group btn-group-sm">
+                                                        <button class="btn btn-outline-info" 
+                                                                onclick="verDetalhes('{{ produto.id }}')">
+                                                            <i class="bi bi-eye"></i>
+                                                        </button>
+                                                        <button class="btn btn-outline-warning"
+                                                                onclick="editarProduto('{{ produto.id }}')">
+                                                            <i class="bi bi-pencil"></i>
+                                                        </button>
+                                                        <button class="btn btn-outline-danger"
+                                                                onclick="excluirProduto('{{ produto.id }}')">
+                                                            <i class="bi bi-trash"></i>
+                                                        </button>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                            {% endfor %}
+                                        </tbody>
+                                    </table>
+                                </div>
+                                
+                                <!-- Botões de Ação -->
+                                <div class="mt-3">
+                                    <button class="btn btn-success" onclick="exportarResultados()">
+                                        <i class="bi bi-download me-2"></i>Exportar Resultados para Excel
+                                    </button>
+                                    <button class="btn btn-outline-light ms-2" onclick="window.print()">
+                                        <i class="bi bi-printer me-2"></i>Imprimir Resultados
+                                    </button>
+                                </div>
+                                
+                                {% else %}
+                                <!-- Nenhum Resultado -->
+                                <div class="text-center py-5">
+                                    <i class="bi bi-search display-1 text-muted"></i>
+                                    <h4 class="mt-3">Nenhum resultado encontrado</h4>
+                                    <p class="text-muted">
+                                        {% if termo %}
+                                        Não encontramos resultados para "{{ termo }}". Tente com outros termos.
+                                        {% else %}
+                                        Use o formulário acima para buscar produtos.
+                                        {% endif %}
+                                    </p>
+                                    <div class="mt-4">
+                                        <h5>Sugestões de busca:</h5>
+                                        <div class="d-flex justify-content-center flex-wrap gap-2 mt-3">
+                                            <span class="badge bg-secondary p-2">amido</span>
+                                            <span class="badge bg-secondary p-2">milho</span>
+                                            <span class="badge bg-secondary p-2">200g</span>
+                                            <span class="badge bg-secondary p-2">tradicional</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal de Detalhes -->
+<div class="modal fade" id="modalDetalhes" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content bg-dark">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="bi bi-info-circle me-2"></i>Detalhes do Produto
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="modalDetalhesBody">
+                <!-- Detalhes serão carregados aqui -->
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    $(document).ready(function() {
+        // Atualizar contador de resultados
+        $('#total-resultados').text({{ resultados|length }});
+        
+        // Busca rápida
+        $('.buscar-rapido').click(function() {
+            const termo = $(this).data('termo');
+            $('#termo').val(termo);
+            $('#form-busca').submit();
+        });
+        
+        // Aplicar filtros
+        $('#btn-aplicar-filtros').click(function() {
+            $('#form-busca').submit();
+        });
+        
+        // Limpar filtros
+        $('#btn-limpar-filtros').click(function() {
+            $('#termo').val('');
+            $('input[name="filtro_situacao"]').prop('checked', true);
+            $('input[name="preco_min"], input[name="preco_max"]').val('');
+            $('input[name="perc_min"], input[name="perc_max"]').val('');
+            $('#form-busca').submit();
+        });
+        
+        // Auto-focus no campo de busca
+        $('#termo').focus();
+    });
+    
+    function verDetalhes(id) {
+        // Buscar detalhes do produto (simulação)
+        const produto = {% if resultados %}{
+            {% for p in resultados %}
+            '{{ p.id }}': {{ p|tojson }}{% if not loop.last %},{% endif %}
+            {% endfor %}
+        }{% else %}{}{% endif %}[id];
+        
+        if (produto) {
+            const html = `
+                <div class="row">
+                    <div class="col-md-6">
+                        <h6>Informações Básicas</h6>
+                        <table class="table table-sm table-borderless">
+                            <tr><td><strong>Produto:</strong></td><td>${produto.produto}</td></tr>
+                            <tr><td><strong>Código NF:</strong></td><td>${produto.codigo_nf || '-'}</td></tr>
+                            <tr><td><strong>Data Cadastro:</strong></td><td>${produto.data_cadastro || '-'}</td></tr>
+                        </table>
+                    </div>
+                    <div class="col-md-6">
+                        <h6>Preços</h6>
+                        <table class="table table-sm table-borderless">
+                            <tr><td><strong>Mercado:</strong></td><td>R$ ${produto.mercado.toFixed(2)}</td></tr>
+                            <tr><td><strong>Preço NF:</strong></td><td>R$ ${produto.preco_nf.toFixed(2)}</td></tr>
+                            <tr><td><strong>Imposto:</strong></td><td>${produto.imposto_perc.toFixed(2)}%</td></tr>
+                        </table>
+                    </div>
+                </div>
+                
+                <hr>
+                
+                <div class="row">
+                    <div class="col-md-6">
+                        <h6>Cálculos</h6>
+                        <table class="table table-sm table-borderless">
+                            <tr><td><strong>PC NF + Imposto:</strong></td><td>R$ ${produto.pc_nf_imposto.toFixed(2)}</td></tr>
+                            <tr><td><strong>PMZ CD/LOJA:</strong></td><td>R$ ${produto.pmz_cd.toFixed(2)}</td></tr>
+                            <tr><td><strong>PC DIST:</strong></td><td>R$ ${produto.pc_dist.toFixed(2)}</td></tr>
+                            <tr><td><strong>PC PISO:</strong></td><td>R$ ${produto.pc_piso.toFixed(2)}</td></tr>
+                        </table>
+                    </div>
+                    <div class="col-md-6">
+                        <h6>Comparações</h6>
+                        <table class="table table-sm table-borderless">
+                            <tr><td><strong>% NF vs Mercado:</strong></td><td>${produto.perc_nf_mercado.toFixed(2)}%</td></tr>
+                            <tr><td><strong>% PMZ vs Mercado:</strong></td><td>${produto.perc_pmz_mercado.toFixed(2)}%</td></tr>
+                            <tr><td><strong>% PISO vs Mercado:</strong></td><td>${produto.perc_piso_mercado.toFixed(2)}%</td></tr>
+                            <tr><td><strong>Novo Custo:</strong></td><td>R$ ${produto.novo_custo.toFixed(2)}</td></tr>
+                            <tr><td><strong>Diferença:</strong></td><td>R$ ${produto.dif_nf.toFixed(2)}</td></tr>
+                        </table>
+                    </div>
+                </div>
+                
+                <div class="alert alert-${produto.situacao} mt-3">
+                    <h6>Situação: ${produto.situacao_texto}</h6>
+                    <p class="mb-0">
+                        Este produto está ${Math.abs(produto.perc_piso_mercado).toFixed(2)}% 
+                        ${produto.perc_piso_mercado >= 0 ? 'acima' : 'abaixo'} do preço de mercado.
+                    </p>
+                </div>
+            `;
+            
+            $('#modalDetalhesBody').html(html);
+            new bootstrap.Modal(document.getElementById('modalDetalhes')).show();
+        }
+    }
+    
+    function editarProduto(id) {
+        alert('Funcionalidade de edição em desenvolvimento!');
+    }
+    
+    function excluirProduto(id) {
+        if (confirm('Tem certeza que deseja excluir este produto?')) {
+            // Aqui faria uma requisição AJAX para excluir
+            alert('Produto excluído (simulação)');
+            location.reload();
+        }
+    }
+    
+    function exportarResultados() {
+        window.location.href = '/exportar';
+    }
+</script>
+{% endblock %}

@@ -1,0 +1,574 @@
+{% extends "base.html" %}
+
+{% block title %}Análise - Calculadora de Precificação{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title mb-0">
+                    <i class="bi bi-bar-chart me-2"></i>Análise e Relatórios
+                </h3>
+                <p class="text-muted mb-0 mt-2">
+                    Visualizações e insights sobre a situação dos produtos
+                </p>
+            </div>
+            <div class="card-body">
+                <!-- Filtros da Análise -->
+                <div class="row mb-4">
+                    <div class="col-12">
+                        <div class="card bg-dark border-secondary">
+                            <div class="card-body">
+                                <div class="row g-3 align-items-center">
+                                    <div class="col-md-3">
+                                        <label class="form-label">Período</label>
+                                        <select class="form-select" id="filtro-periodo">
+                                            <option value="todos">Todos os períodos</option>
+                                            <option value="7d">Últimos 7 dias</option>
+                                            <option value="30d">Últimos 30 dias</option>
+                                            <option value="90d">Últimos 90 dias</option>
+                                        </select>
+                                    </div>
+                                    
+                                    <div class="col-md-3">
+                                        <label class="form-label">Situação</label>
+                                        <select class="form-select" id="filtro-situacao">
+                                            <option value="todas">Todas as situações</option>
+                                            <option value="success">Apenas competitivos</option>
+                                            <option value="warning">Apenas atenção</option>
+                                            <option value="danger">Apenas críticos</option>
+                                        </select>
+                                    </div>
+                                    
+                                    <div class="col-md-3">
+                                        <label class="form-label">Tipo de Análise</label>
+                                        <select class="form-select" id="filtro-tipo">
+                                            <option value="geral">Análise Geral</option>
+                                            <option value="comparativa">Comparativa</option>
+                                            <option value="tendencia">Tendência</option>
+                                        </select>
+                                    </div>
+                                    
+                                    <div class="col-md-3">
+                                        <label class="form-label">&nbsp;</label>
+                                        <div class="d-grid">
+                                            <button class="btn btn-primary" id="btn-atualizar-analise">
+                                                <i class="bi bi-arrow-clockwise me-2"></i>Atualizar
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                {% if produtos %}
+                <!-- Métricas Principais -->
+                <div class="row mb-4">
+                    <div class="col-md-3">
+                        <div class="card metric-card">
+                            <div class="metric-label">Produtos Analisados</div>
+                            <div class="metric-value">{{ produtos|length }}</div>
+                            <i class="bi bi-box text-primary" style="font-size: 2rem;"></i>
+                        </div>
+                    </div>
+                    
+                    <div class="col-md-3">
+                        <div class="card metric-card">
+                            <div class="metric-label">% Médio vs Mercado</div>
+                            <div class="metric-value">
+                                {{ "%.1f"|format(produtos|sum(attribute='perc_piso_mercado')/produtos|length) }}%
+                            </div>
+                            <i class="bi bi-percent text-warning" style="font-size: 2rem;"></i>
+                        </div>
+                    </div>
+                    
+                    <div class="col-md-3">
+                        <div class="card metric-card">
+                            <div class="metric-label">Economia Potencial</div>
+                            <div class="metric-value">
+                                R$ {{ "%.2f"|format(produtos|sum(attribute='dif_nf')) }}
+                            </div>
+                            <i class="bi bi-currency-dollar text-success" style="font-size: 2rem;"></i>
+                        </div>
+                    </div>
+                    
+                    <div class="col-md-3">
+                        <div class="card metric-card">
+                            <div class="metric-label">Preço NF Médio</div>
+                            <div class="metric-value">
+                                R$ {{ "%.2f"|format(produtos|sum(attribute='preco_nf')/produtos|length) }}
+                            </div>
+                            <i class="bi bi-cash text-info" style="font-size: 2rem;"></i>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Gráficos -->
+                <div class="row mb-4">
+                    <div class="col-md-6">
+                        <div class="card">
+                            <div class="card-header">
+                                <h5 class="card-title mb-0">
+                                    <i class="bi bi-pie-chart me-2"></i>Distribuição por Situação
+                                </h5>
+                            </div>
+                            <div class="card-body">
+                                <canvas id="chartSituacao" height="250"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="col-md-6">
+                        <div class="card">
+                            <div class="card-header">
+                                <h5 class="card-title mb-0">
+                                    <i class="bi bi-bar-chart me-2"></i>Top 10 - % vs Mercado
+                                </h5>
+                            </div>
+                            <div class="card-body">
+                                <canvas id="chartTop10" height="250"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Tabela de Produtos Críticos -->
+                <div class="row mb-4">
+                    <div class="col-12">
+                        <div class="card">
+                            <div class="card-header">
+                                <h5 class="card-title mb-0">
+                                    <i class="bi bi-exclamation-triangle text-danger me-2"></i>
+                                    Produtos em Situação Crítica
+                                    <span class="badge bg-danger ms-2">
+                                        {{ produtos|selectattr('situacao', 'equalto', 'danger')|list|length }}
+                                    </span>
+                                </h5>
+                            </div>
+                            <div class="card-body">
+                                {% set produtos_criticos = produtos|selectattr('situacao', 'equalto', 'danger')|list %}
+                                {% if produtos_criticos %}
+                                <div class="table-responsive">
+                                    <table class="table table-dark table-hover">
+                                        <thead>
+                                            <tr>
+                                                <th>Produto</th>
+                                                <th>Código NF</th>
+                                                <th>Preço NF</th>
+                                                <th>Mercado</th>
+                                                <th>% vs Mercado</th>
+                                                <th>Novo Custo</th>
+                                                <th>Diferença</th>
+                                                <th>Economia</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {% for produto in produtos_criticos|sort(attribute='perc_piso_mercado') %}
+                                            <tr>
+                                                <td>{{ produto.produto }}</td>
+                                                <td>{{ produto.codigo_nf or '-' }}</td>
+                                                <td>R$ {{ "%.2f"|format(produto.preco_nf) }}</td>
+                                                <td>R$ {{ "%.2f"|format(produto.mercado) }}</td>
+                                                <td>
+                                                    <span class="text-danger">
+                                                        {{ "%.2f"|format(produto.perc_piso_mercado) }}%
+                                                    </span>
+                                                </td>
+                                                <td>R$ {{ "%.2f"|format(produto.novo_custo) }}</td>
+                                                <td>
+                                                    <span class="text-danger">
+                                                        R$ {{ "%.2f"|format(produto.dif_nf) }}
+                                                    </span>
+                                                </td>
+                                                <td>
+                                                    <span class="badge bg-danger">
+                                                        R$ {{ "%.2f"|format(produto.preco_nf - produto.novo_custo) }}
+                                                    </span>
+                                                </td>
+                                            </tr>
+                                            {% endfor %}
+                                        </tbody>
+                                    </table>
+                                </div>
+                                
+                                <div class="alert alert-danger mt-3">
+                                    <h6>
+                                        <i class="bi bi-lightbulb me-2"></i>
+                                        Ação Recomendada
+                                    </h6>
+                                    <p class="mb-0">
+                                        Existem {{ produtos_criticos|length }} produtos em situação crítica. 
+                                        A economia potencial total é de 
+                                        <strong>R$ {{ "%.2f"|format(produtos_criticos|sum(attribute='dif_nf')) }}</strong>.
+                                        Considere renegociar com fornecedores ou revisar estratégias de preço.
+                                    </p>
+                                </div>
+                                {% else %}
+                                <div class="text-center py-4">
+                                    <i class="bi bi-check-circle display-1 text-success"></i>
+                                    <h4 class="mt-3">Excelente!</h4>
+                                    <p class="text-muted">Nenhum produto em situação crítica encontrado.</p>
+                                </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Análise Comparativa -->
+                <div class="row">
+                    <div class="col-md-8">
+                        <div class="card">
+                            <div class="card-header">
+                                <h5 class="card-title mb-0">
+                                    <i class="bi bi-graph-up me-2"></i>Comparação de Preços
+                                </h5>
+                            </div>
+                            <div class="card-body">
+                                <canvas id="chartComparacao" height="300"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="col-md-4">
+                        <div class="card">
+                            <div class="card-header">
+                                <h5 class="card-title mb-0">
+                                    <i class="bi bi-trophy me-2"></i>Top 5 Melhores
+                                </h5>
+                            </div>
+                            <div class="card-body">
+                                {% set top_melhores = produtos|sort(attribute='perc_piso_mercado', reverse=True)|list %}
+                                {% for produto in top_melhores[:5] %}
+                                <div class="card bg-dark border-success mb-2">
+                                    <div class="card-body">
+                                        <h6 class="card-title">{{ produto.produto }}</h6>
+                                        <div class="d-flex justify-content-between">
+                                            <span class="text-success">
+                                                {{ "%.2f"|format(produto.perc_piso_mercado) }}%
+                                            </span>
+                                            <span class="badge bg-success">
+                                                R$ {{ "%.2f"|format(produto.mercado - produto.preco_nf) }}
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Relatórios -->
+                <div class="row mt-4">
+                    <div class="col-12">
+                        <div class="card">
+                            <div class="card-header">
+                                <h5 class="card-title mb-0">
+                                    <i class="bi bi-file-earmark-text me-2"></i>Gerar Relatórios
+                                </h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="row g-3">
+                                    <div class="col-md-4">
+                                        <div class="card bg-dark border-info">
+                                            <div class="card-body text-center">
+                                                <i class="bi bi-file-earmark-excel display-4 text-info mb-3"></i>
+                                                <h5>Relatório Completo</h5>
+                                                <p class="text-muted">Todos os dados em Excel</p>
+                                                <a href="/exportar" class="btn btn-outline-info w-100">
+                                                    <i class="bi bi-download me-2"></i>Exportar Excel
+                                                </a>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="col-md-4">
+                                        <div class="card bg-dark border-warning">
+                                            <div class="card-body text-center">
+                                                <i class="bi bi-printer display-4 text-warning mb-3"></i>
+                                                <h5>Relatório de Análise</h5>
+                                                <p class="text-muted">Grágicos e métricas em PDF</p>
+                                                <button class="btn btn-outline-warning w-100" onclick="window.print()">
+                                                    <i class="bi bi-printer me-2"></i>Imprimir
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="col-md-4">
+                                        <div class="card bg-dark border-danger">
+                                            <div class="card-body text-center">
+                                                <i class="bi bi-exclamation-triangle display-4 text-danger mb-3"></i>
+                                                <h5>Relatório Crítico</h5>
+                                                <p class="text-muted">Apenas produtos críticos</p>
+                                                <button class="btn btn-outline-danger w-100" id="btn-relatorio-critico">
+                                                    <i class="bi bi-download me-2"></i>Gerar
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                {% else %}
+                <!-- Nenhum Dado -->
+                <div class="text-center py-5">
+                    <i class="bi bi-bar-chart display-1 text-muted"></i>
+                    <h4 class="mt-3">Nenhum dado para análise</h4>
+                    <p class="text-muted">
+                        Adicione produtos para visualizar análises e relatórios.
+                    </p>
+                    <div class="mt-4">
+                        <a href="/adicionar" class="btn btn-primary me-2">
+                            <i class="bi bi-plus-circle me-2"></i>Adicionar Produto
+                        </a>
+                        <a href="/importar" class="btn btn-success">
+                            <i class="bi bi-upload me-2"></i>Importar Excel
+                        </a>
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    $(document).ready(function() {
+        // Inicializar gráficos se houver produtos
+        {% if produtos %}
+        inicializarGraficos();
+        {% endif %}
+        
+        // Atualizar análise
+        $('#btn-atualizar-analise').click(function() {
+            const periodo = $('#filtro-periodo').val();
+            const situacao = $('#filtro-situacao').val();
+            const tipo = $('#filtro-tipo').val();
+            
+            // Aqui faria uma requisição AJAX para atualizar os dados
+            alert('Filtros aplicados: ' + periodo + ', ' + situacao + ', ' + tipo);
+            // Recarregaria os gráficos com os novos dados
+        });
+        
+        // Gerar relatório crítico
+        $('#btn-relatorio-critico').click(function() {
+            alert('Gerando relatório de produtos críticos...');
+            // Implementaria geração de relatório específico
+        });
+    });
+    
+    function inicializarGraficos() {
+        // Dados para os gráficos
+        const dados = {
+            situacoes: {
+                labels: ['Competitivo', 'Atenção', 'Crítico'],
+                data: [
+                    {{ produtos|selectattr('situacao', 'equalto', 'success')|list|length }},
+                    {{ produtos|selectattr('situacao', 'equalto', 'warning')|list|length }},
+                    {{ produtos|selectattr('situacao', 'equalto', 'danger')|list|length }}
+                ]
+            },
+            top10: {
+                labels: {{ produtos|sort(attribute='perc_piso_mercado')|map(attribute='produto')|list|slice(0, 10)|tojson }},
+                data: {{ produtos|sort(attribute='perc_piso_mercado')|map(attribute='perc_piso_mercado')|list|slice(0, 10)|tojson }}
+            }
+        };
+        
+        // Gráfico de Situação
+        const ctxSituacao = document.getElementById('chartSituacao').getContext('2d');
+        new Chart(ctxSituacao, {
+            type: 'doughnut',
+            data: {
+                labels: dados.situacoes.labels,
+                datasets: [{
+                    data: dados.situacoes.data,
+                    backgroundColor: [
+                        '#198754',
+                        '#ffc107',
+                        '#dc3545'
+                    ],
+                    borderWidth: 2,
+                    borderColor: '#212529'
+                }]
+            },
+            options: {
+                responsive: true,
+                plugins: {
+                    legend: {
+                        position: 'bottom',
+                        labels: {
+                            color: '#f8f9fa'
+                        }
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                                const value = context.raw;
+                                const percentage = Math.round((value / total) * 100);
+                                return `${context.label}: ${value} (${percentage}%)`;
+                            }
+                        }
+                    }
+                }
+            }
+        });
+        
+        // Gráfico Top 10
+        const ctxTop10 = document.getElementById('chartTop10').getContext('2d');
+        new Chart(ctxTop10, {
+            type: 'bar',
+            data: {
+                labels: dados.top10.labels,
+                datasets: [{
+                    label: '% vs Mercado',
+                    data: dados.top10.data,
+                    backgroundColor: dados.top10.data.map(value => 
+                        value >= 0 ? '#198754' : 
+                        value > -20 ? '#ffc107' : 
+                        '#dc3545'
+                    ),
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                indexAxis: 'y',
+                plugins: {
+                    legend: {
+                        display: false
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                return `${context.parsed.x}% vs mercado`;
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    x: {
+                        ticks: {
+                            color: '#f8f9fa'
+                        },
+                        grid: {
+                            color: '#495057'
+                        }
+                    },
+                    y: {
+                        ticks: {
+                            color: '#f8f9fa'
+                        },
+                        grid: {
+                            color: '#495057'
+                        }
+                    }
+                }
+            }
+        });
+        
+        // Gráfico de Comparação
+        const ctxComparacao = document.getElementById('chartComparacao').getContext('2d');
+        const produtosComparacao = {{ produtos|slice(0, 5)|tojson }};
+        
+        new Chart(ctxComparacao, {
+            type: 'bar',
+            data: {
+                labels: produtosComparacao.map(p => p.produto),
+                datasets: [
+                    {
+                        label: 'Preço NF',
+                        data: produtosComparacao.map(p => p.preco_nf),
+                        backgroundColor: '#0d6efd',
+                        borderWidth: 1
+                    },
+                    {
+                        label: 'Preço Mercado',
+                        data: produtosComparacao.map(p => p.mercado),
+                        backgroundColor: '#198754',
+                        borderWidth: 1
+                    },
+                    {
+                        label: 'Novo Custo',
+                        data: produtosComparacao.map(p => p.novo_custo),
+                        backgroundColor: '#ffc107',
+                        borderWidth: 1
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                plugins: {
+                    legend: {
+                        labels: {
+                            color: '#f8f9fa'
+                        }
+                    }
+                },
+                scales: {
+                    x: {
+                        ticks: {
+                            color: '#f8f9fa'
+                        },
+                        grid: {
+                            color: '#495057'
+                        }
+                    },
+                    y: {
+                        ticks: {
+                            color: '#f8f9fa',
+                            callback: function(value) {
+                                return 'R$ ' + value.toFixed(2);
+                            }
+                        },
+                        grid: {
+                            color: '#495057'
+                        }
+                    }
+                }
+            }
+        });
+    }
+</script>
+
+<style>
+    @media print {
+        .navbar, .sidebar, .card-header button, .btn {
+            display: none !important;
+        }
+        
+        .card {
+            border: 1px solid #000 !important;
+            page-break-inside: avoid;
+        }
+        
+        body {
+            background-color: white !important;
+            color: black !important;
+        }
+        
+        .main-content {
+            margin-left: 0 !important;
+            padding: 0 !important;
+        }
+        
+        .table-dark {
+            background-color: white !important;
+            color: black !important;
+        }
+        
+        .table-dark th,
+        .table-dark td {
+            border-color: #000 !important;
+        }
+    }
+</style>
+{% endblock %}

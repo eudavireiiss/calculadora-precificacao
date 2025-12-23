@@ -1,0 +1,421 @@
+{% extends "base.html" %}
+
+{% block title %}Importar Excel - Calculadora de Precificação{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title mb-0">
+                    <i class="bi bi-upload me-2"></i>Importar Produtos do Excel
+                </h3>
+                <p class="text-muted mb-0 mt-2">Carregue sua planilha com produtos e configure os campos para importação</p>
+            </div>
+            <div class="card-body">
+                <!-- Upload de Arquivo -->
+                <div class="row mb-4">
+                    <div class="col-md-8">
+                        <div class="card">
+                            <div class="card-body">
+                                <h5 class="card-title">
+                                    <i class="bi bi-file-earmark-excel me-2 text-success"></i>Passo 1: Carregar Arquivo
+                                </h5>
+                                <p class="card-text">Selecione um arquivo Excel (.xlsx) com sua lista de produtos</p>
+                                
+                                <div class="mb-3">
+                                    <input type="file" class="form-control" id="file-input" accept=".xlsx">
+                                    <small class="text-muted">A primeira coluna deve conter os nomes dos produtos</small>
+                                </div>
+                                
+                                <button class="btn btn-success" id="btn-carregar">
+                                    <i class="bi bi-upload me-2"></i>Carregar Arquivo
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="col-md-4">
+                        <div class="card">
+                            <div class="card-body">
+                                <h5 class="card-title">
+                                    <i class="bi bi-info-circle me-2 text-info"></i>Formato Esperado
+                                </h5>
+                                <ul class="list-unstyled">
+                                    <li><i class="bi bi-check-circle text-success me-2"></i>Arquivo .xlsx</li>
+                                    <li><i class="bi bi-check-circle text-success me-2"></i>Coluna com nomes dos produtos</li>
+                                    <li><i class="bi bi-check-circle text-success me-2"></i>Coluna com códigos (opcional)</li>
+                                    <li><i class="bi bi-check-circle text-success me-2"></i>Coluna com preços (opcional)</li>
+                                </ul>
+                                <div class="alert alert-info mt-3">
+                                    <small>
+                                        <i class="bi bi-lightbulb me-2"></i>
+                                        <strong>Dica:</strong> Você pode usar valores padrão para todos os produtos ou mapear colunas específicas
+                                    </small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Mapeamento de Colunas -->
+                <div class="row mb-4" id="mapeamento-section" style="display: none;">
+                    <div class="col-12">
+                        <div class="card">
+                            <div class="card-header">
+                                <h5 class="card-title mb-0">
+                                    <i class="bi bi-columns me-2 text-primary"></i>Passo 2: Mapear Colunas
+                                </h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="row">
+                                    <div class="col-md-4">
+                                        <div class="mb-3">
+                                            <label class="form-label">Coluna dos Produtos *</label>
+                                            <select class="form-select" id="coluna-produtos">
+                                                <option value="">Selecione uma coluna</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="col-md-4">
+                                        <div class="mb-3">
+                                            <label class="form-label">Coluna do Código NF</label>
+                                            <select class="form-select" id="coluna-codigo">
+                                                <option value="">Não importar</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="col-md-4">
+                                        <div class="mb-3">
+                                            <label class="form-label">Coluna do Preço NF</label>
+                                            <select class="form-select" id="coluna-preco-nf">
+                                                <option value="">Não importar</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <!-- Preview da Tabela -->
+                                <div class="mt-3">
+                                    <h6>Pré-visualização dos Dados</h6>
+                                    <div class="table-responsive">
+                                        <table class="table table-dark table-sm" id="preview-table">
+                                            <thead id="preview-head">
+                                                <tr></tr>
+                                            </thead>
+                                            <tbody id="preview-body">
+                                                <tr>
+                                                    <td colspan="5" class="text-center">Nenhum dado carregado</td>
+                                                </tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Configuração de Valores -->
+                <div class="row mb-4" id="config-section" style="display: none;">
+                    <div class="col-12">
+                        <div class="card">
+                            <div class="card-header">
+                                <h5 class="card-title mb-0">
+                                    <i class="bi bi-sliders me-2 text-warning"></i>Passo 3: Configurar Valores
+                                </h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="row">
+                                    <div class="col-md-3">
+                                        <div class="mb-3">
+                                            <label class="form-label">Preço de Mercado (R$)</label>
+                                            <input type="number" class="form-control" id="valor-mercado" 
+                                                   step="0.01" value="2.49">
+                                            <small class="text-muted">Será aplicado a todos os produtos</small>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="col-md-3">
+                                        <div class="mb-3">
+                                            <label class="form-label">Preço NF (R$)</label>
+                                            <input type="number" class="form-control" id="valor-preco-nf" 
+                                                   step="0.01" value="3.00">
+                                            <small class="form-text text-muted">Usado se não mapear coluna</small>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="col-md-3">
+                                        <div class="mb-3">
+                                            <label class="form-label">Imposto (%)</label>
+                                            <input type="number" class="form-control" id="valor-imposto" 
+                                                   step="0.01" value="2.01">
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="col-md-3">
+                                        <div class="mb-3">
+                                            <label class="form-label">Margem Piso (%)</label>
+                                            <input type="number" class="form-control" id="valor-margem-piso" 
+                                                   step="0.1" value="15.0">
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Seleção de Produtos -->
+                <div class="row mb-4" id="selecao-section" style="display: none;">
+                    <div class="col-12">
+                        <div class="card">
+                            <div class="card-header">
+                                <h5 class="card-title mb-0">
+                                    <i class="bi bi-check2-square me-2 text-success"></i>Passo 4: Selecionar Produtos
+                                </h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="mb-3">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="selecionar-todos">
+                                        <label class="form-check-label" for="selecionar-todos">
+                                            Selecionar todos os produtos
+                                        </label>
+                                    </div>
+                                </div>
+                                
+                                <div class="row" id="lista-produtos-container">
+                                    <!-- Produtos serão carregados aqui -->
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Botões de Ação -->
+                <div class="row">
+                    <div class="col-12">
+                        <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                            <button class="btn btn-secondary me-md-2" id="btn-cancelar">
+                                <i class="bi bi-x-circle me-2"></i>Cancelar
+                            </button>
+                            <button class="btn btn-primary" id="btn-importar" disabled>
+                                <i class="bi bi-database-add me-2"></i>Importar Produtos Selecionados
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Progresso e Resultados -->
+                <div class="row mt-4">
+                    <div class="col-12">
+                        <div id="import-result" style="display: none;">
+                            <!-- Resultados da importação aparecerão aqui -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    let produtosDisponiveis = [];
+    let produtosSelecionados = [];
+    let colunasArquivo = [];
+    
+    $(document).ready(function() {
+        // Carregar arquivo
+        $('#btn-carregar').click(function() {
+            const fileInput = $('#file-input')[0];
+            const file = fileInput.files[0];
+            
+            if (!file) {
+                alert('Por favor, selecione um arquivo Excel.');
+                return;
+            }
+            
+            const formData = new FormData();
+            formData.append('file', file);
+            
+            $.ajax({
+                url: '/importar',
+                type: 'POST',
+                data: formData,
+                processData: false,
+                contentType: false,
+                success: function(response) {
+                    if (response.success) {
+                        colunasArquivo = response.colunas;
+                        produtosDisponiveis = response.preview.map(p => p[colunasArquivo[0]]);
+                        
+                        // Atualizar selects de colunas
+                        atualizarSelectsColunas();
+                        
+                        // Atualizar preview
+                        atualizarPreview(response.preview);
+                        
+                        // Mostrar próximas seções
+                        $('#mapeamento-section').show();
+                        $('#config-section').show();
+                        $('#selecao-section').show();
+                        
+                        // Atualizar lista de produtos
+                        atualizarListaProdutos();
+                        
+                    } else {
+                        alert('Erro: ' + response.message);
+                    }
+                },
+                error: function() {
+                    alert('Erro ao carregar arquivo.');
+                }
+            });
+        });
+        
+        // Atualizar selects de colunas
+        function atualizarSelectsColunas() {
+            const selectProdutos = $('#coluna-produtos');
+            const selectCodigo = $('#coluna-codigo');
+            const selectPrecoNF = $('#coluna-preco-nf');
+            
+            selectProdutos.empty().append('<option value="">Selecione uma coluna</option>');
+            selectCodigo.empty().append('<option value="">Não importar</option>');
+            selectPrecoNF.empty().append('<option value="">Não importar</option>');
+            
+            colunasArquivo.forEach(coluna => {
+                selectProdutos.append(`<option value="${coluna}">${coluna}</option>`);
+                selectCodigo.append(`<option value="${coluna}">${coluna}</option>`);
+                selectPrecoNF.append(`<option value="${coluna}">${coluna}</option>`);
+            });
+            
+            // Selecionar primeira coluna por padrão
+            if (colunasArquivo.length > 0) {
+                selectProdutos.val(colunasArquivo[0]);
+            }
+        }
+        
+        // Atualizar preview
+        function atualizarPreview(data) {
+            const head = $('#preview-head tr');
+            const body = $('#preview-body');
+            
+            // Limpar
+            head.empty();
+            body.empty();
+            
+            // Cabeçalho
+            colunasArquivo.forEach(coluna => {
+                head.append(`<th>${coluna}</th>`);
+            });
+            
+            // Dados
+            data.forEach(row => {
+                const tr = $('<tr></tr>');
+                colunasArquivo.forEach(coluna => {
+                    tr.append(`<td>${row[coluna] || ''}</td>`);
+                });
+                body.append(tr);
+            });
+        }
+        
+        // Atualizar lista de produtos
+        function atualizarListaProdutos() {
+            const container = $('#lista-produtos-container');
+            container.empty();
+            
+            const colunaSelecionada = $('#coluna-produtos').val();
+            
+            if (colunaSelecionada && produtosDisponiveis.length > 0) {
+                produtosDisponiveis.forEach((produto, index) => {
+                    const col = $('<div class="col-md-3 mb-2"></div>');
+                    col.html(`
+                        <div class="form-check">
+                            <input class="form-check-input produto-checkbox" type="checkbox" 
+                                   value="${produto}" id="prod-${index}">
+                            <label class="form-check-label" for="prod-${index}">
+                                ${produto}
+                            </label>
+                        </div>
+                    `);
+                    container.append(col);
+                });
+                
+                // Habilitar botão de importação
+                $('#btn-importar').prop('disabled', false);
+            }
+        }
+        
+        // Selecionar todos os produtos
+        $('#selecionar-todos').change(function() {
+            const isChecked = $(this).is(':checked');
+            $('.produto-checkbox').prop('checked', isChecked);
+        });
+        
+        // Importar produtos
+        $('#btn-importar').click(function() {
+            produtosSelecionados = [];
+            $('.produto-checkbox:checked').each(function() {
+                produtosSelecionados.push($(this).val());
+            });
+            
+            if (produtosSelecionados.length === 0) {
+                alert('Selecione pelo menos um produto para importar.');
+                return;
+            }
+            
+            const dados = {
+                coluna_produtos: $('#coluna-produtos').val(),
+                coluna_codigo: $('#coluna-codigo').val(),
+                coluna_preco_nf: $('#coluna-preco-nf').val(),
+                mercado_padrao: $('#valor-mercado').val(),
+                preco_nf_padrao: $('#valor-preco-nf').val(),
+                imposto_padrao: $('#valor-imposto').val(),
+                produtos_selecionados: produtosSelecionados
+            };
+            
+            $.post('/processar-importacao', JSON.stringify(dados), function(response) {
+                if (response.success) {
+                    const resultDiv = $('#import-result');
+                    resultDiv.html(`
+                        <div class="alert alert-success">
+                            <h5><i class="bi bi-check-circle-fill me-2"></i>Importação Concluída!</h5>
+                            <p>${response.message}</p>
+                            <hr>
+                            <p><strong>Produtos importados:</strong> ${response.importados.length}</p>
+                            <button class="btn btn-outline-light btn-sm" id="btn-ver-lista">
+                                <i class="bi bi-list me-2"></i>Ver na Lista
+                            </button>
+                        </div>
+                    `).show();
+                    
+                    // Atualizar estatísticas
+                    atualizarEstatisticas();
+                    
+                    // Limpar formulário
+                    setTimeout(() => {
+                        $('#file-input').val('');
+                        $('#mapeamento-section').hide();
+                        $('#config-section').hide();
+                        $('#selecao-section').hide();
+                        resultDiv.hide();
+                    }, 5000);
+                    
+                } else {
+                    alert('Erro na importação: ' + response.message);
+                }
+            }, 'json');
+        });
+        
+        // Cancelar
+        $('#btn-cancelar').click(function() {
+            if (confirm('Tem certeza que deseja cancelar a importação?')) {
+                window.location.href = '/';
+            }
+        });
+    });
+</script>
+{% endblock %}

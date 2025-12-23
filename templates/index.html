@@ -1,0 +1,227 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - Calculadora de Precificação{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-12">
+        <h1 class="h2 mb-4">
+            <i class="bi bi-speedometer2 me-2"></i>Dashboard
+        </h1>
+        <p class="text-muted">Visão geral da situação de precificação dos produtos</p>
+    </div>
+</div>
+
+<!-- Métricas Rápidas -->
+<div class="row mb-4">
+    <div class="col-md-3">
+        <div class="card metric-card">
+            <div class="metric-label">Total de Produtos</div>
+            <div class="metric-value" id="metric-total">0</div>
+            <i class="bi bi-box-seam text-primary" style="font-size: 2rem;"></i>
+        </div>
+    </div>
+    
+    <div class="col-md-3">
+        <div class="card metric-card">
+            <div class="metric-label">Economia Potencial</div>
+            <div class="metric-value" id="metric-economia">R$ 0,00</div>
+            <i class="bi bi-currency-dollar text-success" style="font-size: 2rem;"></i>
+        </div>
+    </div>
+    
+    <div class="col-md-3">
+        <div class="card metric-card">
+            <div class="metric-label">Produtos Críticos</div>
+            <div class="metric-value" id="metric-criticos">0</div>
+            <i class="bi bi-exclamation-triangle text-danger" style="font-size: 2rem;"></i>
+        </div>
+    </div>
+    
+    <div class="col-md-3">
+        <div class="card metric-card">
+            <div class="metric-label">% Médio vs Mercado</div>
+            <div class="metric-value" id="metric-percentual">0%</div>
+            <i class="bi bi-percent text-warning" style="font-size: 2rem;"></i>
+        </div>
+    </div>
+</div>
+
+<!-- Gráfico -->
+<div class="row mb-4">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="bi bi-bar-chart me-2"></i>Distribuição por Situação
+                </h5>
+            </div>
+            <div class="card-body">
+                <canvas id="situacaoChart" height="200"></canvas>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="bi bi-lightning-charge me-2"></i>Ações Rápidas
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="d-grid gap-2">
+                    <a href="/adicionar" class="btn btn-primary btn-lg">
+                        <i class="bi bi-plus-circle me-2"></i>Adicionar Produto
+                    </a>
+                    <a href="/importar" class="btn btn-success btn-lg">
+                        <i class="bi bi-upload me-2"></i>Importar Excel
+                    </a>
+                    <a href="/buscar" class="btn btn-info btn-lg">
+                        <i class="bi bi-search me-2"></i>Buscar NF
+                    </a>
+                    <a href="/exportar" class="btn btn-warning btn-lg">
+                        <i class="bi bi-download me-2"></i>Exportar Resultados
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Últimos Produtos -->
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="bi bi-clock-history me-2"></i>Últimos Produtos Adicionados
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-dark table-hover">
+                        <thead>
+                            <tr>
+                                <th>Produto</th>
+                                <th>Código NF</th>
+                                <th>Preço NF</th>
+                                <th>Mercado</th>
+                                <th>% vs Mercado</th>
+                                <th>Situação</th>
+                                <th>Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody id="ultimos-produtos">
+                            <tr>
+                                <td colspan="7" class="text-center">Nenhum produto cadastrado</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    $(document).ready(function() {
+        // Carregar dados iniciais
+        carregarDashboard();
+        
+        function carregarDashboard() {
+            $.get('/api/estatisticas', function(data) {
+                // Atualizar métricas
+                $('#metric-total').text(data.total);
+                $('#metric-economia').text('R$ ' + data.economia_total.toFixed(2));
+                $('#metric-criticos').text(data.criticos);
+                
+                // Calcular percentual médio (simulação)
+                let percentualMedio = data.total > 0 ? -15 : 0;
+                $('#metric-percentual').text(percentualMedio + '%');
+                
+                // Atualizar gráfico
+                atualizarGrafico(data);
+                
+                // Carregar últimos produtos
+                carregarUltimosProdutos();
+            });
+        }
+        
+        function atualizarGrafico(data) {
+            const ctx = document.getElementById('situacaoChart').getContext('2d');
+            
+            if (window.situacaoChart) {
+                window.situacaoChart.destroy();
+            }
+            
+            window.situacaoChart = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Competitivo', 'Atenção', 'Crítico'],
+                    datasets: [{
+                        data: [data.competitivos, data.atencao, data.criticos],
+                        backgroundColor: [
+                            '#198754',
+                            '#ffc107',
+                            '#dc3545'
+                        ],
+                        borderWidth: 2,
+                        borderColor: '#212529'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: {
+                            position: 'bottom',
+                            labels: {
+                                color: '#f8f9fa',
+                                padding: 20
+                            }
+                        }
+                    }
+                }
+            });
+        }
+        
+        function carregarUltimosProdutos() {
+            $.get('/api/estatisticas', function() {
+                // Simulação - em uma aplicação real, teria uma API para produtos
+                let html = '';
+                
+                {% for produto in produtos[:5] %}
+                html += `
+                    <tr>
+                        <td>{{ produto.produto }}</td>
+                        <td>{{ produto.codigo_nf }}</td>
+                        <td>R$ {{ "%.2f"|format(produto.preco_nf) }}</td>
+                        <td>R$ {{ "%.2f"|format(produto.mercado) }}</td>
+                        <td>{{ "%.2f"|format(produto.perc_piso_mercado) }}%</td>
+                        <td>
+                            <span class="badge bg-{{ produto.situacao }}">
+                                {{ produto.situacao_texto }}
+                            </span>
+                        </td>
+                        <td>
+                            <button class="btn btn-sm btn-outline-info">
+                                <i class="bi bi-eye"></i>
+                            </button>
+                        </td>
+                    </tr>
+                `;
+                {% endfor %}
+                
+                if (html === '') {
+                    html = '<tr><td colspan="7" class="text-center">Nenhum produto cadastrado</td></tr>';
+                }
+                
+                $('#ultimos-produtos').html(html);
+            });
+        }
+        
+        // Atualizar a cada 10 segundos
+        setInterval(carregarDashboard, 10000);
+    });
+</script>
+{% endblock %}

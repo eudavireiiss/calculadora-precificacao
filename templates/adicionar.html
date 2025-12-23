@@ -1,0 +1,224 @@
+{% extends "base.html" %}
+
+{% block title %}Adicionar Produto - Calculadora de Precificação{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-8 mx-auto">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title mb-0">
+                    <i class="bi bi-plus-circle me-2"></i>Adicionar Novo Produto
+                </h3>
+            </div>
+            <div class="card-body">
+                <form id="form-adicionar">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="produto" class="form-label">Nome do Produto *</label>
+                                <input type="text" class="form-control" id="produto" required
+                                       placeholder="Ex: Amido de Milho 200g">
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label for="codigo_nf" class="form-label">Código NF (Opcional)</label>
+                                <input type="text" class="form-control" id="codigo_nf"
+                                       placeholder="Código da nota fiscal">
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label for="mercado" class="form-label">Preço de Mercado (R$) *</label>
+                                <input type="number" class="form-control" id="mercado" step="0.01" 
+                                       value="2.49" required>
+                                <small class="text-muted">Preço praticado pela concorrência</small>
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="preco_nf" class="form-label">Preço NF (R$) *</label>
+                                <input type="number" class="form-control" id="preco_nf" step="0.01" 
+                                       value="3.00" required>
+                                <small class="text-muted">Seu custo na nota fiscal</small>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label for="imposto_perc" class="form-label">Imposto (%) *</label>
+                                <input type="number" class="form-control" id="imposto_perc" step="0.01" 
+                                       value="2.01" required>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label class="form-label">Margens (Opcional)</label>
+                                <div class="row g-2">
+                                    <div class="col-6">
+                                        <input type="number" class="form-control" placeholder="Margem CD %" value="10.1" step="0.1">
+                                    </div>
+                                    <div class="col-6">
+                                        <input type="number" class="form-control" placeholder="Margem Piso %" value="15.0" step="0.1">
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-12">
+                            <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                                <button type="button" class="btn btn-secondary me-md-2" id="btn-calcular">
+                                    <i class="bi bi-calculator me-2"></i>Calcular
+                                </button>
+                                <button type="submit" class="btn btn-primary">
+                                    <i class="bi bi-save me-2"></i>Salvar Produto
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </form>
+                
+                <!-- Resultados do Cálculo -->
+                <div class="mt-4" id="resultados" style="display: none;">
+                    <h5 class="mb-3">
+                        <i class="bi bi-graph-up me-2"></i>Resultados do Cálculo
+                    </h5>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="card mb-3">
+                                <div class="card-body">
+                                    <h6 class="card-subtitle mb-2 text-muted">Custos e Preços</h6>
+                                    <table class="table table-sm table-borderless">
+                                        <tr>
+                                            <td>PC NF + IMPOSTO:</td>
+                                            <td class="text-end" id="result-pc-nf-imposto">R$ 0,00</td>
+                                        </tr>
+                                        <tr>
+                                            <td>PMZ CD/LOJA:</td>
+                                            <td class="text-end" id="result-pmz-cd">R$ 0,00</td>
+                                        </tr>
+                                        <tr>
+                                            <td>PC DIST:</td>
+                                            <td class="text-end" id="result-pc-dist">R$ 0,00</td>
+                                        </tr>
+                                        <tr>
+                                            <td>PC PISO:</td>
+                                            <td class="text-end" id="result-pc-piso">R$ 0,00</td>
+                                        </tr>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <div class="card mb-3">
+                                <div class="card-body">
+                                    <h6 class="card-subtitle mb-2 text-muted">Comparações</h6>
+                                    <table class="table table-sm table-borderless">
+                                        <tr>
+                                            <td>% NF vs Mercado:</td>
+                                            <td class="text-end" id="result-perc-nf">0,00%</td>
+                                        </tr>
+                                        <tr>
+                                            <td>% PISO vs Mercado:</td>
+                                            <td class="text-end" id="result-perc-piso">0,00%</td>
+                                        </tr>
+                                        <tr>
+                                            <td>Novo Custo Necessário:</td>
+                                            <td class="text-end" id="result-novo-custo">R$ 0,00</td>
+                                        </tr>
+                                        <tr>
+                                            <td>Diferença no Custo:</td>
+                                            <td class="text-end" id="result-dif-nf">R$ 0,00</td>
+                                        </tr>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="alert" id="result-situacao">
+                        <strong id="result-situacao-texto"></strong>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    $(document).ready(function() {
+        // Calcular resultados
+        $('#btn-calcular').click(function() {
+            calcularResultados();
+        });
+        
+        // Enviar formulário
+        $('#form-adicionar').submit(function(e) {
+            e.preventDefault();
+            salvarProduto();
+        });
+        
+        function calcularResultados() {
+            const dados = {
+                mercado: parseFloat($('#mercado').val()),
+                preco_nf: parseFloat($('#preco_nf').val()),
+                imposto_perc: parseFloat($('#imposto_perc').val())
+            };
+            
+            $.post('/api/calcular', JSON.stringify(dados), function(response) {
+                if (response.success) {
+                    const r = response.resultados;
+                    
+                    // Atualizar resultados
+                    $('#result-pc-nf-imposto').text('R$ ' + r.pc_nf_imposto.toFixed(2));
+                    $('#result-pmz-cd').text('R$ ' + r.pmz_cd.toFixed(2));
+                    $('#result-pc-dist').text('R$ ' + r.pc_dist.toFixed(2));
+                    $('#result-pc-piso').text('R$ ' + r.pc_piso.toFixed(2));
+                    $('#result-perc-nf').text(r.perc_nf_mercado.toFixed(2) + '%');
+                    $('#result-perc-piso').text(r.perc_piso_mercado.toFixed(2) + '%');
+                    $('#result-novo-custo').text('R$ ' + r.novo_custo.toFixed(2));
+                    $('#result-dif-nf').text('R$ ' + r.dif_nf.toFixed(2));
+                    
+                    // Atualizar situação
+                    const situacaoAlert = $('#result-situacao');
+                    situacaoAlert.removeClass('alert-success alert-warning alert-danger');
+                    situacaoAlert.addClass('alert-' + r.situacao);
+                    $('#result-situacao-texto').text(r.situacao_texto);
+                    
+                    // Mostrar resultados
+                    $('#resultados').show();
+                }
+            }, 'json');
+        }
+        
+        function salvarProduto() {
+            const produto = {
+                produto: $('#produto').val(),
+                codigo_nf: $('#codigo_nf').val(),
+                mercado: parseFloat($('#mercado').val()),
+                preco_nf: parseFloat($('#preco_nf').val()),
+                imposto_perc: parseFloat($('#imposto_perc').val())
+            };
+            
+            $.post('/adicionar', produto, function(response) {
+                if (response.success) {
+                    alert('Produto adicionado com sucesso!');
+                    
+                    // Limpar formulário
+                    $('#form-adicionar')[0].reset();
+                    $('#mercado').val('2.49');
+                    $('#preco_nf').val('3.00');
+                    $('#imposto_perc').val('2.01');
+                    $('#resultados').hide();
+                    
+                    // Atualizar estatísticas
+                    atualizarEstatisticas();
+                } else {
+                    alert('Erro: ' + response.message);
+                }
+            }, 'json');
+        }
+    });
+</script>
+{% endblock %}
